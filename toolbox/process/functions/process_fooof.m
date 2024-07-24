@@ -237,7 +237,6 @@ end
 %% ===================================================================================
 %  ===== MATLAB FOOOF ================================================================
 %  ===================================================================================
-%% ===== MATLAB STANDALONE FOOOF =====
 function [fs, fg] = FOOOF_matlab_nll(TF, Freqs, opt, hOT)
     % Find all frequency values within user limits
     fMask = (round(Freqs.*10)./10 >= opt.freq_range(1)) & (round(Freqs.*10)./10 <= opt.freq_range(2)) & ~mod(sum(abs(round(Freqs.*10)./10-[1;2;3].*str2double(opt.power_line)) >= 2),3);
@@ -256,7 +255,8 @@ function [fs, fg] = FOOOF_matlab_nll(TF, Freqs, opt, hOT)
             'error',            [],...
             'r_squared',        []);
     % Iterate across channels
-    for chan = 1:nChan
+    bst_progress('text',['Standby: ms-specparam is running in parallel']);
+    parfor chan = 1:nChan
         bst_progress('set', bst_round(chan / nChan,2) * 100);
         % Fit aperiodic
         aperiodic_pars = robust_ap_fit(fs, spec(chan,:), opt.aperiodic_mode);
