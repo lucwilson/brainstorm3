@@ -3250,6 +3250,15 @@ function PlotHandles = PlotAxes(iDS, hAxes, PlotHandles, TimeVector, F, TsInfo, 
     if (TsInfo.ShowLegend)
         if isempty(LinesColor)
             ColorOrder = panel_scout('GetScoutsColorTable');
+            iHbO = find(cellfun(@(x)~isempty(x), strfind(LinesLabels, 'HbO')));
+            iHbR = find(cellfun(@(x)~isempty(x), strfind(LinesLabels, 'HbR')));
+            iHbT = find(cellfun(@(x)~isempty(x), strfind(LinesLabels, 'HbT')));
+            if (~isempty(iHbO) &&  ~isempty(iHbR)) || (~isempty(iHbO) &&  ~isempty(iHbT)) || (~isempty(iHbT) &&  ~isempty(iHbR))
+                ColorsGRB = ColorOrder(1:3,:);
+                ColorOrder(iHbO,:) = repmat(ColorsGRB(2,:), length(iHbO),1); % Red
+                ColorOrder(iHbR,:) = repmat(ColorsGRB(3,:), length(iHbR),1); % Blue
+                ColorOrder(iHbT,:) = repmat(ColorsGRB(1,:), length(iHbT),1); % Green
+            end
         else
             ColorOrder = [];
         end
@@ -3928,7 +3937,7 @@ function UpdateScaleBar(iDS, iFig, TsInfo)
     barMeasure = fScaled / TsInfo.DefaultFactor;
     % Get position where to plot the legend
     nChan = length(PlotHandles.hLines);
-    centerOffset = PlotHandles.ChannelOffsets(min(2,nChan)) + 1/(nChan+2)/2;
+    centerOffset = PlotHandles.ChannelOffsets(1) + 1/(nChan+2)/2;
     % Plot bar for the maximum amplitude
     xBar = .3;
     yBar = centerOffset + 1/(nChan+2) * [-0.5, 0.5] / zoomFactor;

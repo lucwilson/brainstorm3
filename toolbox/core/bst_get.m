@@ -203,6 +203,7 @@ function [argout1, argout2, argout3, argout4, argout5] = bst_get( varargin )
 %    - bst_get('LastPsdDisplayFunction')  : Display option of measure for spectrum (log, power, magnitude, etc.)
 %    - bst_get('PlotlyCredentials')       : Get the credentials and URL to connect to plot.ly server
 %    - bst_get('ExportBidsOptions')       : Additional metadata for BIDS export
+%    - bst_get('Pipelines')               : Saved Pipelines stored
 %
 % SEE ALSO bst_set
 
@@ -500,6 +501,9 @@ switch contextName
         
     case 'BrainstormDbFile'
         argout1 = bst_fullfile(bst_get('BrainstormUserDir'), 'brainstorm.mat');
+
+    case 'Pipelines'
+        argout1 = GlobalData.Processes.Pipelines;
 
 %% ==== PROTOCOL ====
     case 'iProtocol'
@@ -2397,6 +2401,11 @@ switch contextName
         end
         
         % Get defaults from internet
+        if ~ismember('aal1', lower({sTemplates.Name}))
+            sTemplates(end+1).FilePath = 'http://neuroimage.usc.edu/bst/getupdate.php?t=mni_AAL1';
+            sTemplates(end).Name = 'AAL1';
+            sTemplates(end).Info = 'https://www.gin.cnrs.fr/en/tools/aal/';
+        end
         if ~ismember('aal2', lower({sTemplates.Name}))
             sTemplates(end+1).FilePath = 'http://neuroimage.usc.edu/bst/getupdate.php?t=mni_AAL2';
             sTemplates(end).Name = 'AAL2';
@@ -2804,16 +2813,22 @@ switch contextName
         end
         
     case 'SpmTpmAtlas'
+        preferSpm = 0;
+        % CALL: bst_get('SpmTpmAtlas', 'SPM')
+        if (nargin >= 2) && strcmpi(varargin{2}, 'SPM')
+            preferSpm = 1;
+        end
+
         % Get template file
         tpmUser = bst_fullfile(bst_get('BrainstormUserDir'), 'defaults', 'spm', 'TPM.nii');
-        if file_exist(tpmUser)
+        if file_exist(tpmUser) && ~preferSpm
             argout1 = tpmUser;
             disp(['BST> SPM12 template found: ' tpmUser]);
             return;
         end
         % If it does not exist: check in brainstorm3 folder
         tpmDistrib = bst_fullfile(bst_get('BrainstormHomeDir'), 'defaults', 'spm', 'TPM.nii');
-        if file_exist(tpmDistrib)
+        if file_exist(tpmDistrib) && ~preferSpm
             argout1 = tpmDistrib;
             disp(['BST> SPM12 template found: ' tpmDistrib]);
             return;
@@ -2826,6 +2841,9 @@ switch contextName
                 argout1 = tpmSpm;
                 disp(['BST> SPM12 template found: ' tpmSpm]);
                 return;
+            elseif preferSpm
+               argout1 = bst_get('SpmTpmAtlas');
+               return
             end
         else
             tpmSpm = '';
@@ -2837,8 +2855,7 @@ switch contextName
         if ~isempty(tpmSpm)
             disp([' - ' tpmSpm]);
         end
-        % Return the preferred location: .brainstorm/defaults/spm/TPM.nii
-        argout1 = tpmUser;
+        argout1 = [];
         
     case 'PythonExe'
         % Get saved value
@@ -3096,6 +3113,7 @@ switch contextName
     case 'TopoLayoutOptions'
         defPref = struct(...
             'TimeWindow',      [], ...
+            'FreqWindow',      [], ...
             'WhiteBackground', 0, ...
             'ShowRefLines',    1, ...
             'ShowLegend',      1, ...
@@ -3128,9 +3146,9 @@ switch contextName
         
     case 'ProcessOptions'
         defPref = struct(...
-            'SavedParam',    struct(), ...
-            'MaxBlockSize',  100 / 8 * 1024 * 1024, ...   % 100Mb
-            'LastMaxBlockSize',  100 / 8 * 1024 * 1024);  % 100Mb
+            'SavedParam',       struct(), ...
+            'MaxBlockSize',      100 * 1024 * 1024 / 8, ...   % 100MiB == 13,107,200 doubles
+            'LastMaxBlockSize',  100 * 1024 * 1024 / 8);      % 100MiB == 13,107,200 doubles
         argout1 = FillMissingFields(contextName, defPref);
         
     case 'ImportEegRawOptions'
@@ -3540,7 +3558,8 @@ switch contextName
                 argout1 = {...
                     {'.mesh'}, 'BrainVISA (*.mesh)',   'MESH'; ...
                     {'.dfs'},  'BrainSuite (*.dfs)',   'DFS'; ...
-                    {'.fs'},   'FreeSurfer (*.fs)',    'FS'
+                    {'.fs'},   'FreeSurfer (*.fs)',    'FS'; ...
+                    {'.obj'},  'Wavefront OBJ (*.obj)', 'OBJ'; ...
                     {'.off'},  'Geomview OFF (*.off)', 'OFF'; ...
                     {'.gii'},  'GIfTI (*.gii)',        'GII'; ...
                     {'.tri'},  'TRI (*.tri)',          'TRI'; ...
@@ -3745,6 +3764,7 @@ switch contextName
                     {'.txt'},          'Array of samples (*.txt)',     'ARRAY-SAMPLES'; ...
                     {'.txt','.csv'},   'CSV text file: label, time, duration (*.txt;*.csv)', 'CSV-TIME'; ...
                     {'.txt'},          'CTF Video Times (*.txt)',      'CTFVIDEO'; ...
+                    {'.tsv'},          'BIDS events: onset, duration, trial_type (*.tsv)', 'BIDS'; ...
                     };
             case 'channel'
                 argout1 = {...
@@ -3768,7 +3788,7 @@ switch contextName
                     {'.tsv'},                      'EEG: BIDS electrodes.tsv, CapTrak space mm (*.tsv)',    'BIDS-CAPTRAK-MM'; ...
                     {'.els','.xyz'},               'EEG: Cartool (*.els;*.xyz)',          'CARTOOL'; ...
                     {'.eeg'},                      'EEG: MegDraw (*.eeg)',                'MEGDRAW'; ...
-                    {'.res','.rs3','.pom'},        'EEG: Curry (*.res;*.rs3;*.pom)',      'CURRY'; ...
+                    {'.res','.rs3','.pom'},        'EEG: Curry, LPS (*.res;*.rs3;*.pom)', 'CURRY'; ...
                     {'.ced','.xyz','.set'},        'EEG: EEGLAB (*.ced;*.xyz;*.set)',     'EEGLAB'; ...
                     {'.elc'},                      'EEG: EETrak (*.elc)',                 'EETRAK'; ...
                     {'.sfp'},                      'EEG: EGI (*.sfp)',                    'EGI'; ...
@@ -3824,7 +3844,7 @@ switch contextName
                     {'.txt'}, 'EEG/NIRS: ASCII: XYZ,Name (*.txt)',        'ASCII_XYZN-EEG'; ...
                     {'.txt'}, 'EEG/NIRS: ASCII: XYZ_MNI,Name (*.txt)',    'ASCII_XYZN_MNI-EEG'; ...
                     {'.txt'}, 'EEG/NIRS: ASCII: XYZ_World,Name (*.txt)',  'ASCII_XYZN_WORLD-EEG'; ...
-                    {'.txt'}, 'NIRS: Brainsight (*.txt)',            'BRAINSIGHT-TXT'; ...
+                    {'.txt'}, 'EEG/NIRS: Brainsight (*.txt)',             'BRAINSIGHT-TXT'; ...
                     {'.tsv'}, 'NIRS: BIDS optrodes.tsv, subject space mm (*.tsv)',     'BIDS-NIRS-SCANRAS-MM'; ...
                     {'.tsv'}, 'NIRS: BIDS optrodes.tsv, MNI space mm (*.tsv)',         'BIDS-NIRS-MNI-MM'; ...
                     {'.tsv'}, 'NIRS: BIDS optrodes.tsv, ALS/SCS/CTF space mm (*.tsv)', 'BIDS-NIRS-ALS-MM'; ...
